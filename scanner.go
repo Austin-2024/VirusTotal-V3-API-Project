@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	//"os"
+	"os"
+	"os/exec"
+	"strings"
 )
 
 type VirusTotalResponse struct {
@@ -25,10 +27,7 @@ type VirusTotalResponse struct {
 	} `json:"data"`
 }
 
-func scanURL() {
-	fmt.Print("URL to scan: ")
-	var URL string
-	fmt.Scan(&URL)
+func analyzeURL(URL string) {
 
 	var urlID = base64.RawURLEncoding.EncodeToString([]byte(URL))
 
@@ -37,7 +36,7 @@ func scanURL() {
 	req, _ := http.NewRequest("GET", url, nil)
 
 	req.Header.Add("accept", "application/json")
-	req.Header.Add("x-apikey", "")
+	req.Header.Add("x-apikey", "APIKEY")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Println("Request failed:", err)
@@ -78,8 +77,55 @@ func scanURL() {
 
 }
 
-func scanFILE() {
-	fmt.Print()
+func scanURL() {
+	fmt.Print("URL to scan: ")
+	var URL string
+	fmt.Scan(&URL)
+
+	url := "https://www.virustotal.com/api/v3/urls"
+
+	url = URL
+	payload := strings.NewReader(url)
+
+	req, _ := http.NewRequest("POST", url, payload)
+
+	req.Header.Add("accept", "application/json")
+	req.Header.Add("x-apikey", "APIKEY")
+	req.Header.Add("content-type", "application/x-www-form-urlencoded")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println("Error: ", err)
+		return
+	}
+	defer res.Body.Close()
+
+	analyzeURL(URL)
+	return
+
+}
+
+func scanFile() {
+
+	cmd := exec.Command("python", "filePicker.py")
+
+	err := cmd.Run()
+
+	if err != nil {
+		fmt.Println("Error", err)
+		return
+	}
+
+	filename := "filepath.txt"
+
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		fmt.Println("Error", err)
+		return
+	}
+
+	fmt.Println(content)
+
 }
 
 func main() {
@@ -95,6 +141,11 @@ func main() {
 
 	if scanOption == 1 {
 		scanURL()
+	} else if scanOption == 2 {
+		scanFile()
+	} else {
+		fmt.Println("\nYou selected an invalid option, please select either 1 or 2.")
+		main()
 	}
 
 }
