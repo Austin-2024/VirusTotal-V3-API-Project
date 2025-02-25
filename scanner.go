@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"os/exec"
@@ -25,6 +27,12 @@ type VirusTotalResponse struct {
 			} `json:"last_analysis_stats"`
 		} `json:"attributes"`
 	} `json:"data"`
+}
+
+type FileScanID struct {
+	Data struct {
+		ID string `json:"id"`
+	}
 }
 
 func analyzeURL(URL string) {
@@ -105,7 +113,99 @@ func scanURL() {
 
 }
 
-func scanFile() {
+func analyzeFile(scanID []byte) {
+
+	var FileUploadBody FileScanID
+	err := json.Unmarshal(scanID, &FileUploadBody)
+	if err != nil {
+		fmt.Println("Error parsing json:", err)
+		return
+	}
+
+	fmt.Println("ID2:", FileUploadBody.Data.ID)
+
+	var urlID = base64.RawURLEncoding.EncodeToString([]byte(FileUploadBody.Data.ID))
+
+	url := "https://www.virustotal.com/api/v3/files/" + urlID
+
+	req, _ := http.NewRequest("GET", url, nil)
+
+	req.Header.Add("accept", "application/json")
+	req.Header.Add("x-apikey", "APIKEY")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+
+	fmt.Println(string(body))
+
+}
+
+func scanFile(path string) {
+
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	defer file.Close()
+
+	var requestBody bytes.Buffer
+	writer := multipart.NewWriter(&requestBody)
+
+	part, err := writer.CreateFormFile("file", path)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	_, err = io.Copy(part, file)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	err = writer.Close()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	url := "https://www.virustotal.com/api/v3/files"
+
+	req, _ := http.NewRequest("POST", url, &requestBody)
+
+	req.Header.Add("accept", "application/json")
+	req.Header.Add("x-apikey", "APIKEY")
+	req.Header.Add("content-type", writer.FormDataContentType())
+
+	results, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+
+	defer results.Body.Close()
+	body, _ := io.ReadAll(results.Body)
+
+	var test FileScanID
+	err = json.Unmarshal(body, &test)
+	if err != nil {
+		fmt.Println("Error parsing json:", err)
+		return
+	}
+
+	fmt.Println("ID:", test.Data.ID)
+
+	analyzeFile(body)
+
+}
+
+func pickFile() {
 
 	cmd := exec.Command("python", "filePicker.py")
 
@@ -118,13 +218,23 @@ func scanFile() {
 
 	filename := "filepath.txt"
 
+	f, err := os.Open(filename)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	defer f.Close()
+
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		fmt.Println("Error", err)
 		return
 	}
 
-	fmt.Println(content)
+	fmt.Println(string(content))
+
+	scanFile(string(content))
 
 }
 
@@ -142,7 +252,7 @@ func main() {
 	if scanOption == 1 {
 		scanURL()
 	} else if scanOption == 2 {
-		scanFile()
+		pickFile()
 	} else {
 		fmt.Println("\nYou selected an invalid option, please select either 1 or 2.")
 		main()
