@@ -30,6 +30,22 @@ type VirusTotalResponse struct {
 	} `json:"data"`
 }
 
+type VirusTotalFileReport struct {
+	Data struct {
+		Links struct {
+			Self string `json:"link"`
+		} `json:"links"`
+		Attributes struct {
+			Stats struct {
+				Malicious  int `json:"malicious"`
+				Suspicious int `json:"suspicious"`
+				Undetected int `json:"undetected"`
+				Harmless   int `json:"harmless"`
+			}
+		} `json:"attributes"`
+	} `json:"data"`
+}
+
 // Struct for getting the id from file upload section
 type FileScanID struct {
 	Data struct {
@@ -143,7 +159,7 @@ func scanURL() {
 
 // Function for retrieving the scan results
 // scanID is the id gotten from uploading the file | It is a []byte type
-func analyzeFile(scanID []byte) {
+func analyzeFile(scanID []byte, path string) {
 
 	// Accessing the FileScanID struct to retrieve the scanID
 	var FileUploadBody FileScanID
@@ -153,14 +169,8 @@ func analyzeFile(scanID []byte) {
 		return
 	}
 
-	// Debug print statement to see if the ID is grabbed
-	fmt.Println("ID2:", FileUploadBody.Data.ID)
-
-	// Testing to see if the urlID needed to be encoded
-	var urlID = base64.RawURLEncoding.EncodeToString([]byte(FileUploadBody.Data.ID))
-
 	// url for api calls
-	url := "https://www.virustotal.com/api/v3/files/" + urlID
+	url := "https://www.virustotal.com/api/v3/analyses/" + FileUploadBody.Data.ID
 
 	// Creates the request
 	req, _ := http.NewRequest("GET", url, nil)
@@ -176,7 +186,25 @@ func analyzeFile(scanID []byte) {
 	defer res.Body.Close()
 	body, _ := io.ReadAll(res.Body)
 
-	fmt.Println(string(body))
+	//fmt.Println(string(body))
+
+	// Gets the body json from the VirusTotalResponse struct | The struct is towards the top of the program
+	var fileResults VirusTotalFileReport
+	// Checks for errors, also for some reason required. If I leave this part out I can't even get data from it
+	err = json.Unmarshal(body, &fileResults) // Still new to json stuff so idk what this does besides check for errors when reading the json
+	if err != nil {
+		fmt.Println("Error parsing json:", err)
+		return
+	}
+
+	// Outputs the scan results | The only results it shows is the numerical score
+	// How many scanners said the url was Harmless, Malicious, Suspicious, or Undetected
+	fmt.Println("\nScan results for " + path)
+	fmt.Println("Virus Total URL:", fileResults.Data.Links.Self)
+	fmt.Println("Harmless:", fileResults.Data.Attributes.Stats.Harmless)
+	fmt.Println("Malicious:", fileResults.Data.Attributes.Stats.Malicious)
+	fmt.Println("Suspicious:", fileResults.Data.Attributes.Stats.Suspicious)
+	fmt.Println("Undetected:", fileResults.Data.Attributes.Stats.Undetected)
 
 }
 
@@ -240,18 +268,8 @@ func scanFile(path string) {
 	// Saves the body to a variable
 	body, _ := io.ReadAll(results.Body)
 
-	// This is for debugging because I'm having issues getting the scan results back
-	var test FileScanID
-	err = json.Unmarshal(body, &test)
-	if err != nil {
-		fmt.Println("Error parsing json:", err)
-		return
-	}
-
-	fmt.Println("ID:", test.Data.ID)
-
 	// Calls the function for retrieving the scan results
-	analyzeFile(body)
+	analyzeFile(body, path)
 
 }
 
