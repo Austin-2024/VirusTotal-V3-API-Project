@@ -11,6 +11,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 // Struct for saving the body in the url scan section
@@ -55,6 +57,14 @@ type FileScanID struct {
 
 func analyzeURL(URL string) {
 
+	err := godotenv.Load("APIKEY.env")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	apikey := os.Getenv("APIKEY")
+
 	// Encodes the user submitted URL into base64. This is done because that's what the VT docs said the format of the url needed to be
 	var urlID = base64.RawURLEncoding.EncodeToString([]byte(URL))
 
@@ -65,7 +75,7 @@ func analyzeURL(URL string) {
 	req, _ := http.NewRequest("GET", url, nil)
 
 	req.Header.Add("accept", "application/json")
-	req.Header.Add("x-apikey", "APIKEY") // APIKEY goes here
+	req.Header.Add("x-apikey", apikey) // APIKEY goes here
 
 	// Sends the request
 	res, err := http.DefaultClient.Do(req)
@@ -79,21 +89,21 @@ func analyzeURL(URL string) {
 	body, _ := io.ReadAll(res.Body)
 
 	// This commented out part saves the body to a json file. If you wish to save the output to json then uncomment this block
-	/*
-		file, err := os.Create("body.json")
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+	/**/
+	file, err := os.Create("urlReport.json")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-		defer file.Close()
+	defer file.Close()
 
-		_, err = file.Write(body)
-		if err != nil {
-			fmt.Println("Failed to write to file", err)
-			return
-		}
-	*/
+	_, err = file.Write(body)
+	if err != nil {
+		fmt.Println("Failed to write to file", err)
+		return
+	}
+	/**/
 
 	// Gets the body json from the VirusTotalResponse struct | The struct is towards the top of the program
 	var urlResults VirusTotalResponse
@@ -112,13 +122,21 @@ func analyzeURL(URL string) {
 	fmt.Println("Malicious:", urlResults.Data.Attributes.LastAnalysisStats.Malicious)
 	fmt.Println("Suspicious:", urlResults.Data.Attributes.LastAnalysisStats.Suspicious)
 	fmt.Println("Undetected:", urlResults.Data.Attributes.LastAnalysisStats.Undetected)
-	return
 
 }
 
 // This function takes the url, sends it to virustotal and scans it. The function it calls then retrieves the analysis
 // report to be displayed to the user
 func scanURL() {
+
+	err := godotenv.Load("APIKEY.env")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	apikey := os.Getenv("APIKEY")
+
 	fmt.Print("URL to scan: ")
 	var URL string // User submitted URL to be scanned
 	fmt.Scan(&URL)
@@ -136,7 +154,7 @@ func scanURL() {
 
 	// Required headers by VirusTotal | Not completely sure what they do, but the documentation said these were needed
 	req.Header.Add("accept", "application/json")
-	req.Header.Add("x-apikey", "APIKEY") // I do know this one :) it's the apikey header so they can authenticate the API call
+	req.Header.Add("x-apikey", apikey) // I do know this one :) it's the apikey header so they can authenticate the API call
 	req.Header.Add("content-type", "application/x-www-form-urlencoded")
 
 	// This sends the http request with the headers set above
@@ -153,7 +171,6 @@ func scanURL() {
 	// Calls the function for getting the scan analysis, also sends the URL variable
 	// The url variable is the URL that the user submitted
 	analyzeURL(URL)
-	return
 
 }
 
@@ -161,9 +178,17 @@ func scanURL() {
 // scanID is the id gotten from uploading the file | It is a []byte type
 func analyzeFile(scanID []byte, path string) {
 
+	err := godotenv.Load("APIKEY.env")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	apikey := os.Getenv("APIKEY")
+
 	// Accessing the FileScanID struct to retrieve the scanID
 	var FileUploadBody FileScanID
-	err := json.Unmarshal(scanID, &FileUploadBody)
+	err = json.Unmarshal(scanID, &FileUploadBody)
 	if err != nil {
 		fmt.Println("Error parsing json:", err)
 		return
@@ -176,7 +201,7 @@ func analyzeFile(scanID []byte, path string) {
 	req, _ := http.NewRequest("GET", url, nil)
 
 	req.Header.Add("accept", "application/json")
-	req.Header.Add("x-apikey", "APIKEY")
+	req.Header.Add("x-apikey", apikey)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -186,7 +211,22 @@ func analyzeFile(scanID []byte, path string) {
 	defer res.Body.Close()
 	body, _ := io.ReadAll(res.Body)
 
-	//fmt.Println(string(body))
+	// This commented out part saves the body to a json file. If you wish to save the output to json then uncomment this block
+	/**/
+	file, err := os.Create("fileReport.json")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	defer file.Close()
+
+	_, err = file.Write(body)
+	if err != nil {
+		fmt.Println("Failed to write to file", err)
+		return
+	}
+	/**/
 
 	// Gets the body json from the VirusTotalResponse struct | The struct is towards the top of the program
 	var fileResults VirusTotalFileReport
@@ -211,6 +251,14 @@ func analyzeFile(scanID []byte, path string) {
 // Function for uploading the file to VirusTotal to be scanned
 // The end of this function calls the function that retrieves the report from virustotal
 func scanFile(path string) {
+
+	err := godotenv.Load("APIKEY.env")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	apikey := os.Getenv("APIKEY")
 
 	// Opens the file to be used
 	file, err := os.Open(path)
@@ -254,7 +302,7 @@ func scanFile(path string) {
 
 	// Headers for the request
 	req.Header.Add("accept", "application/json")
-	req.Header.Add("x-apikey", "APIKEY")
+	req.Header.Add("x-apikey", apikey)
 	req.Header.Add("content-type", writer.FormDataContentType())
 
 	// Sends the request
