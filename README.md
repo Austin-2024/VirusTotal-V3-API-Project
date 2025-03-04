@@ -7,3 +7,4 @@ This is my first time working with an API, so it may be rough around the edges a
 
 Any suggestions would be much appreciated!
 
+The .gitignore was created from https://www.toptal.com/developers/gitignore/api/go
