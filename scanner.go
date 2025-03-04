@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -44,6 +45,7 @@ type VirusTotalFileReport struct {
 				Undetected int `json:"undetected"`
 				Harmless   int `json:"harmless"`
 			}
+			Status string `json:"status"` // Scan status
 		} `json:"attributes"`
 	} `json:"data"`
 }
@@ -202,7 +204,7 @@ func analyzeFile(scanID []byte, path string) {
 
 	req.Header.Add("accept", "application/json")
 	req.Header.Add("x-apikey", apikey)
-
+Loop:
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -211,7 +213,7 @@ func analyzeFile(scanID []byte, path string) {
 	defer res.Body.Close()
 	body, _ := io.ReadAll(res.Body)
 
-	// This commented out part saves the body to a json file. If you wish to save the output to json then uncomment this block
+	// This part saves the body to a json file. If you don't want the full scan results then comment this block out
 	/**/
 	file, err := os.Create("fileReport.json")
 	if err != nil {
@@ -235,6 +237,17 @@ func analyzeFile(scanID []byte, path string) {
 	if err != nil {
 		fmt.Println("Error parsing json:", err)
 		return
+	}
+
+	// This loop checks the status of the scan.
+	for {
+		if fileResults.Data.Attributes.Status != "completed" { // If the status of the scan isn't completed then...
+			fmt.Println("Waiting for file to finish scanning")
+			time.Sleep(5 * time.Second) // Wait 5 seconds then...
+			goto Loop                   // Goto a predefined line in this function to check the results of the file | Line 207
+		} else {
+			break // If the scan status is completed then break out of this loop and print out the results
+		}
 	}
 
 	// Outputs the scan results | The only results it shows is the numerical score
